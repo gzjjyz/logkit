@@ -22,7 +22,7 @@ func NewReader(cfgFilePath string, forwarder ForwardFunc) (*Reader, error) {
 	}
 
 	if cfgFilePath == "" {
-		cfgFilePath = defaultCfgFilePath
+		cfgFilePath = utils.GetCurrentDir() + defaultCfgFilePath
 	}
 
 	var (
