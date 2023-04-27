@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/995933447/confloader"
 	"github.com/gzjjyz/srvlib/logger"
-	"jjyz/base/utils"
+	"github.com/gzjjyz/srvlib/utils"
 	"sync"
 	"time"
 )
