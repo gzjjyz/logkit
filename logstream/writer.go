@@ -21,7 +21,7 @@ func NewWriter(cfgFilePath string) (*Writer, error) {
 	}
 
 	if cfgFilePath == "" {
-		cfgFilePath = utils.GetCurrentDir() + defaultCfgFilePath
+		cfgFilePath = defaultCfgFilePath
 	}
 
 	var cfg Cfg
