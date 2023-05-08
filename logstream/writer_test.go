@@ -19,7 +19,7 @@ func TestWriter_Flush(t *testing.T) {
 		return
 	}
 	for i := 0; i < 2; i++ {
-		writer.Write("test_topic2", []byte(fmt.Sprintf("hello world:%d times", i)))
+		writer.Write("test_topic23", []byte(fmt.Sprintf("hello world:%d times", i)))
 	}
 	writer.Flush()
 }
