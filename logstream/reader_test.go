@@ -3,20 +3,19 @@ package logstream
 import (
 	"fmt"
 	"github.com/gzjjyz/srvlib/logger"
+	"os"
+	"os/signal"
 	"testing"
-	"time"
 )
 
 func TestReader_Start(t *testing.T) {
-	logger.InitLogger("logstreamtest")
+	logger.InitLogger("testreader")
+
 	var (
 		readStream *Reader
 		err        error
 	)
 	readStream, err = NewReader("", func(items []*PoppedMsgItem) error {
-		time.Sleep(time.Second)
-		//return errors.New("mimic err")
-
 		fmt.Println("consume " + items[0].Topic)
 		for _, item := range items {
 			fmt.Println(string(item.Data))
@@ -28,6 +27,13 @@ func TestReader_Start(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
+	go func() {
+		signCh := make(chan os.Signal)
+		signal.Notify(signCh)
+		<-signCh
+		readStream.Exit()
+	}()
 
 	readStream.Start()
 }

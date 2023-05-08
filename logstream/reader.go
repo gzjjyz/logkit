@@ -1,26 +1,20 @@
 package logstream
 
 import (
-	"errors"
 	"github.com/995933447/confloader"
 	"github.com/gzjjyz/srvlib/logger"
-	"github.com/gzjjyz/srvlib/utils"
 	"sync"
 	"time"
 )
 
 const (
-	readerMemMaxBytes          = 1024 * 1024 * 1024 * 2
+	readerMemMaxBytes          = 1024 * 1024 * 2
 	readerMaxConcurrentForward = 300
 	// os thread(8m) + consumer max popped(2m) = 12m
 	readerSchedWorkerMemBytes = 1024 * 1024 * 12
 )
 
 func NewReader(cfgFilePath string, forwarder ForwardFunc) (*Reader, error) {
-	if !logger.HasInit() {
-		return nil, errors.New("logger not init")
-	}
-
 	if cfgFilePath == "" {
 		cfgFilePath = defaultCfgFilePath
 	}
@@ -47,6 +41,7 @@ func NewReader(cfgFilePath string, forwarder ForwardFunc) (*Reader, error) {
 		topicConsumerMap:       map[string]*Consumer{},
 		exitOneSchedWorkerCh:   make(chan struct{}),
 		exitOneForwardWorkerCh: make(chan struct{}),
+		exitSignCh:             make(chan struct{}),
 	}
 
 	if cfg.MemMaxSize != "" {
@@ -71,22 +66,22 @@ func NewReader(cfgFilePath string, forwarder ForwardFunc) (*Reader, error) {
 		return nil, err
 	}
 
-	utils.ProtectGo(func() {
+	go func() {
 		watchReaderCfg(reader, cfgLoader, &cfg)
-	})
+	}()
 
 	return reader, nil
 }
 
 func watchReaderCfg(reader *Reader, cfgLoader *confloader.Loader, cfg *Cfg) {
 	refreshCfgErr := make(chan error)
-	utils.ProtectGo(func() {
+	go func() {
 		refreshCfgTk := time.NewTicker(refreshCfgInterval + time.Second)
 		defer refreshCfgTk.Stop()
 		for {
 			select {
 			case err := <-refreshCfgErr:
-				logger.Errorf(err.Error())
+				logger.Warn(err.Error())
 			case <-refreshCfgTk.C:
 				reader.accessFickleMu.Lock()
 				if reader.baseDir != cfg.BaseDir {
@@ -99,7 +94,7 @@ func watchReaderCfg(reader *Reader, cfgLoader *confloader.Loader, cfg *Cfg) {
 					var err error
 					memMaxBytes, err = parseMemSizeStrToBytes(cfg.MemMaxSize)
 					if err != nil {
-						logger.Errorf(err.Error())
+						logger.Warn(err.Error())
 						break
 					}
 				}
@@ -127,7 +122,7 @@ func watchReaderCfg(reader *Reader, cfgLoader *confloader.Loader, cfg *Cfg) {
 				reader.accessFickleMu.Unlock()
 			}
 		}
-	})
+	}()
 	cfgLoader.WatchToLoad(refreshCfgErr)
 }
 
@@ -153,6 +148,7 @@ type Reader struct {
 	retryCh                chan []*PoppedMsgItem // chan use to retry failed messages
 	exitOneSchedWorkerCh   chan struct{}
 	exitOneForwardWorkerCh chan struct{}
+	exitSignCh             chan struct{}
 }
 
 func (r *Reader) init() error {
@@ -188,9 +184,9 @@ func (r *Reader) init() error {
 		}
 
 		delete(r.topicConsumerMap, old)
-		utils.ProtectGo(func() {
+		go func() {
 			consumer.unsubscribe()
-		})
+		}()
 	}
 
 	err = r.topics.walk(func(topic string) (bool, error) {
@@ -201,11 +197,11 @@ func (r *Reader) init() error {
 				return false, err
 			}
 
-			utils.ProtectGo(func() {
+			go func() {
 				if err = consumer.subscribe(); err != nil {
 					logger.Errorf(err.Error())
 				}
-			})
+			}()
 
 			r.topicConsumerMap[topic] = consumer
 		}
@@ -229,9 +225,9 @@ func (r *Reader) removeAllTopics() {
 		}
 
 		delete(r.topicConsumerMap, topic)
-		utils.ProtectGo(func() {
+		go func() {
 			consumer.unsubscribe()
-		})
+		}()
 	}
 }
 
@@ -239,9 +235,9 @@ func (r *Reader) expandWorkerPool() {
 	if r.waitExpandMemBytes < 0 {
 		removeWorkerNum := int((-r.waitExpandMemBytes) / readerSchedWorkerMemBytes)
 		for i := 0; i < removeWorkerNum; i++ {
-			utils.ProtectGo(func() {
+			go func() {
 				r.exitOneSchedWorkerCh <- struct{}{}
-			})
+			}()
 		}
 	} else if r.waitExpandMemBytes > 0 {
 		addWorkerNum := int(r.waitExpandMemBytes / readerSchedWorkerMemBytes)
@@ -253,9 +249,9 @@ func (r *Reader) expandWorkerPool() {
 
 	if r.waitExpandConcurrentForward < 0 {
 		for i := r.waitExpandConcurrentForward; i < 0; i++ {
-			utils.ProtectGo(func() {
+			go func() {
 				r.exitOneForwardWorkerCh <- struct{}{}
-			})
+			}()
 		}
 	} else if r.waitExpandConcurrentForward > 0 {
 		var i int32
@@ -267,7 +263,7 @@ func (r *Reader) expandWorkerPool() {
 }
 
 func (r *Reader) runSchedWorker() {
-	utils.ProtectGo(func() {
+	go func() {
 		for {
 			select {
 			case <-r.exitOneSchedWorkerCh:
@@ -293,7 +289,7 @@ func (r *Reader) runSchedWorker() {
 		}
 	out:
 		return
-	})
+	}()
 }
 
 func (r *Reader) createSchedWorkerPool() {
@@ -305,7 +301,7 @@ func (r *Reader) createSchedWorkerPool() {
 }
 
 func (r *Reader) runForwardWorker() {
-	utils.ProtectGo(func() {
+	go func() {
 		for {
 			select {
 			case <-r.exitOneForwardWorkerCh:
@@ -322,14 +318,14 @@ func (r *Reader) runForwardWorker() {
 				}
 				r.accessFickleMu.RUnlock()
 				if err := r.doForward(msgItems); err != nil {
-					logger.Errorf(err.Error())
+					logger.Debug(err.Error())
 					r.retryCh <- msgItems
 				}
 			}
 		}
 	out:
 		return
-	})
+	}()
 }
 
 func (r *Reader) createForwardWorkerPool() {
@@ -348,6 +344,18 @@ func (r *Reader) Start() {
 	r.createSchedWorkerPool()
 	r.createForwardWorkerPool()
 
+	defer func() {
+		var wg sync.WaitGroup
+		for _, consumer := range r.topicConsumerMap {
+			wg.Add(1)
+			go func(consumer *Consumer) {
+				defer wg.Done()
+				consumer.unsubscribe()
+			}(consumer)
+		}
+		wg.Wait()
+	}()
+
 	// schedule retry messages and dynamically controller worker pool size
 	expandWorkerPoolTk := time.NewTicker(time.Second * 3)
 	defer expandWorkerPoolTk.Stop()
@@ -365,16 +373,24 @@ func (r *Reader) Start() {
 
 		select {
 		case forwardCh <- retryMsgItems:
-			if len(retryMsgItemsList) == 0 {
-				retryMsgItems = nil
-				forwardCh = nil
-			}
+			retryMsgItems = nil
+			forwardCh = nil
 		case msgItems := <-r.retryCh:
-			retryMsgItemsList = append(retryMsgItemsList, msgItems)
+			consumer := r.topicConsumerMap[msgItems[0].Topic]
+			var notConfirmedList []*PoppedMsgItem
+			for _, msgItem := range msgItems {
+				if !consumer.isNotConfirmed(msgItem.Seq, msgItem.IdxOffset) {
+					continue
+				}
+				notConfirmedList = append(notConfirmedList, msgItem)
+			}
+			retryMsgItemsList = append(retryMsgItemsList, notConfirmedList)
 		case <-expandWorkerPoolTk.C:
 			r.accessFickleMu.RLock()
 			r.expandWorkerPool()
 			r.accessFickleMu.RUnlock()
+		case <-r.exitSignCh:
+			return
 		}
 	}
 }
@@ -385,4 +401,8 @@ func (r *Reader) ConfirmMsg(topic string, seq uint64, idxOffset uint32) {
 		return
 	}
 	consumer.confirmMsg(seq, idxOffset)
+}
+
+func (r *Reader) Exit() {
+	r.exitSignCh <- struct{}{}
 }

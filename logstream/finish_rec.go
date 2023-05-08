@@ -49,7 +49,7 @@ func newConsumeWaterMarkRec(baseDir, topic string) (*ConsumeWaterMarkRec, error)
 		return nil, err
 	}
 
-	rec.idxFp, err = makeSeqIdxFp(baseDir, topic, rec.seq, os.O_CREATE|os.O_RDONLY)
+	rec.idxFp, err = makeSeqIdxFp(baseDir, topic, rec.seq, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +94,7 @@ func (r *ConsumeWaterMarkRec) refreshAndGetOffset() (uint64, uint32, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+
 	for {
 		if n >= finishWaterMarkBytes {
 			break
@@ -118,10 +119,14 @@ func (r *ConsumeWaterMarkRec) getWaterMark() (uint64, uint32) {
 	return r.seq, r.idxNum
 }
 
+func (r *ConsumeWaterMarkRec) syncDisk() {
+	_ = r.fp.Sync()
+}
+
 func (r *ConsumeWaterMarkRec) updateWaterMark(seq uint64, idxNum uint32) error {
 	var err error
 	if seq != r.seq {
-		r.idxFp, err = makeSeqIdxFp(r.baseDir, r.topic, seq, os.O_CREATE|os.O_RDONLY)
+		r.idxFp, err = makeSeqIdxFp(r.baseDir, r.topic, seq, os.O_RDONLY)
 		if err != nil {
 			return err
 		}
@@ -144,6 +149,7 @@ func (r *ConsumeWaterMarkRec) updateWaterMark(seq uint64, idxNum uint32) error {
 	if err != nil {
 		return err
 	}
+
 	for {
 		if n >= finishWaterMarkBytes {
 			break

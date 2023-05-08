@@ -3,6 +3,7 @@ package logstream
 import (
 	"encoding/binary"
 	"github.com/golang/snappy"
+	"github.com/gzjjyz/srvlib/logger"
 	"os"
 	"time"
 )
@@ -68,12 +69,12 @@ func (o *Output) isCorrupted() (bool, error) {
 func (o *Output) syncDisk() {
 	if o.idxFp != nil {
 		if err := o.idxFp.Sync(); err != nil {
-			logWarn(err.Error())
+			logger.Warn(err.Error())
 		}
 	}
 	if o.dataFp != nil {
 		if err := o.dataFp.Sync(); err != nil {
-			logWarn(err.Error())
+			logger.Warn(err.Error())
 		}
 	}
 }

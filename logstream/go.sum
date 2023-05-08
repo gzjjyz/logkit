@@ -1,0 +1,13 @@
+github.com/995933447/confloader v0.0.0-20230314141707-e7b191386ae2 h1:lElTU+vnP6+DR9W6kGbnHXL45zJsXFsWtvYt6bForCA=
+github.com/995933447/confloader v0.0.0-20230314141707-e7b191386ae2/go.mod h1:52j1FekZ42S3gc7Fy8A54Mr0H5MVbEbRLo8rG/HRY5U=
+github.com/BurntSushi/toml v1.2.1 h1:9F2/+DoOYIOksmaJFPw1tGFy1eDnIJXg+UHjuD8lTak=
+github.com/BurntSushi/toml v1.2.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
+github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=
+github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
+github.com/golang/snappy v0.0.4 h1:yAGX7huGHXlcLOEtBnF4w7FQwA26wojNCwOYAEhLjQM=
+github.com/golang/snappy v0.0.4/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+github.com/gzjjyz/srvlib v0.0.6 h1:PPHdFedP3/3DaK9HcDEhwrb1BV9XE8D3a31lpmmtilA=
+github.com/gzjjyz/srvlib v0.0.6/go.mod h1:AMaDOAWcGRdHSST6l47UfAXlyMoWH/EhkN9KgxaAsSo=
+golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.7.0 h1:3jlCCIQZPdOYu1h8BkNvLz8Kgwtae2cagcG/VamtZRU=
+golang.org/x/sys v0.7.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

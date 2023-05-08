@@ -3,6 +3,4 @@
 
 package logstream
 
-import "github.com/gzjjyz/srvlib/utils"
-
-var defaultCfgFilePath = utils.GetCurrentDir() + "logmeta.json"
+var defaultCfgFilePath = "C:\\logstream\\meta.json"

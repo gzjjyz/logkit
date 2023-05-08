@@ -6,7 +6,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/snappy"
 	"github.com/gzjjyz/srvlib/logger"
-	"github.com/gzjjyz/srvlib/utils"
 	"io"
 	"os"
 	"sync"
@@ -49,12 +48,17 @@ func newConsumer(reader *Reader, topic string) (*Consumer, error) {
 		return nil, err
 	}
 
+	consumer.pendingRec, err = newConsumePendingRec(reader.baseDir, topic)
+	if err != nil {
+		return nil, err
+	}
+
 	return consumer, nil
 }
 
 type confirmMsgReq struct {
-	seq    uint64
-	offset uint32
+	seq       uint64
+	idxOffset uint32
 }
 
 type Consumer struct {
@@ -66,6 +70,8 @@ type Consumer struct {
 	nextIdxCursor       uint32
 	finishRec           *ConsumeWaterMarkRec
 	opFinishRecMu       sync.RWMutex
+	pendingRec          *ConsumePendingRec
+	opPendingRecMu      sync.RWMutex
 	msgNum              uint32
 	isWaitingMsgConfirm atomic.Value // bool
 	unsubscribeSignCh   chan struct{}
@@ -73,9 +79,7 @@ type Consumer struct {
 }
 
 func (c *Consumer) switchNextSeqFile() error {
-	origSeq := c.finishRec.seq
-
-	nextSeq, err := scanDirToParseNextSeq(c.baseDir, c.topic, origSeq)
+	nextSeq, err := scanDirToParseNextSeq(c.baseDir, c.topic, c.finishRec.seq)
 	if err != nil {
 		return err
 	}
@@ -95,22 +99,24 @@ func (c *Consumer) switchNextSeqFile() error {
 		return err
 	}
 
-	origIdxFileName := c.idxFp.Name()
-	origDataFileName := c.dataFp.Name()
-	c.idxFp.Close()
-	c.dataFp.Close()
-	utils.ProtectGo(func() {
-		time.Sleep(time.Second * 5)
-		err = os.Remove(origIdxFileName)
+	origIdxFp := c.idxFp
+	origDataFp := c.dataFp
+	go func() {
+		_ = origIdxFp.Sync()
+		_ = origDataFp.Sync()
+		_ = origIdxFp.Close()
+		_ = origDataFp.Close()
+
+		err = os.Remove(origIdxFp.Name())
 		if err != nil {
 			logger.Errorf(err.Error())
 		}
 
-		err = os.Remove(origDataFileName)
+		err = os.Remove(origDataFp.Name())
 		if err != nil {
 			logger.Errorf(err.Error())
 		}
-	})
+	}()
 
 	c.idxFp = idxFp
 	c.dataFp = dataFp
@@ -145,6 +151,8 @@ func (c *Consumer) subscribe() error {
 	// windows no fsnotify
 	directlyTrySwitchFileTk := time.NewTicker(time.Second * 2)
 	defer directlyTrySwitchFileTk.Stop()
+	syncDiskTk := time.NewTicker(time.Second * 5)
+	defer syncDiskTk.Stop()
 	var needWatchNewFile = true
 	for {
 		needSwitchNewFile, err := c.finishRec.isOffsetsFinishedInSeq()
@@ -195,6 +203,9 @@ func (c *Consumer) subscribe() error {
 		logger.Debug(c.topic + " loop into select")
 		select {
 		case <-directlyTrySwitchFileTk.C:
+		case <-syncDiskTk.C:
+			c.finishRec.syncDisk()
+			c.pendingRec.syncDisk()
 		case event := <-fileWatcher.Events:
 			logger.Debug("watch file changed")
 			if event.Has(fsnotify.Chmod) {
@@ -226,8 +237,16 @@ func (c *Consumer) subscribe() error {
 				break
 			}
 
-			var confirmedMax *confirmMsgReq
+			var (
+				confirmedMax *confirmMsgReq
+				unPends      []*pendingMsgIdx
+			)
 			for _, confirmed := range confirmedList {
+				unPends = append(unPends, &pendingMsgIdx{
+					seq:       confirmed.seq,
+					idxOffset: confirmed.idxOffset,
+				})
+
 				if confirmedMax == nil {
 					confirmedMax = confirmed
 					continue
@@ -236,17 +255,24 @@ func (c *Consumer) subscribe() error {
 					confirmedMax = confirmed
 					continue
 				}
-				if confirmed.seq == confirmedMax.seq && confirmed.offset > confirmedMax.offset {
+				if confirmed.seq == confirmedMax.seq && confirmed.idxOffset > confirmedMax.idxOffset {
 					confirmedMax = confirmed
 				}
 			}
 
-			if err = c.doConfirmMsg(confirmedMax.seq, confirmedMax.offset); err != nil {
+			if notPending, err := c.unPendMsg(unPends); err != nil {
+				logger.Errorf(err.Error())
+				break
+			} else if !notPending {
+				break
+			}
+
+			if err = c.updateFinishWaterMark(confirmedMax.seq, confirmedMax.idxOffset); err != nil {
 				logger.Errorf(err.Error())
 				break
 			}
 
-			if confirmedMax.offset < c.nextIdxCursor-1 {
+			if confirmedMax.idxOffset < c.nextIdxCursor-1 {
 				break
 			}
 
@@ -254,6 +280,8 @@ func (c *Consumer) subscribe() error {
 		}
 	}
 out:
+	c.finishRec.syncDisk()
+	c.pendingRec.syncDisk()
 	return nil
 }
 
@@ -285,6 +313,7 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 
 	var (
 		items          []*PoppedMsgItem
+		pendings       []*pendingMsgIdx
 		totalDataBytes int
 		bin            = binary.LittleEndian
 	)
@@ -299,12 +328,17 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 
 		idxBuf := make([]byte, idxBytes)
 		seekIdxBufOffset := c.nextIdxCursor * idxBytes
+		var isEOF bool
 		_, err := c.idxFp.ReadAt(idxBuf, int64(seekIdxBufOffset))
 		if err != nil {
-			if err == io.EOF {
-				return nil, false, nil
+			if err != io.EOF {
+				return nil, false, err
 			}
-			return nil, false, err
+			isEOF = true
+		}
+
+		if len(idxBuf) == 0 {
+			break
 		}
 
 		boundaryBegin := bin.Uint16(idxBuf[:bufBoundaryBytes])
@@ -321,10 +355,14 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 		dataBuf := make([]byte, dataBytes)
 		_, err = c.dataFp.ReadAt(dataBuf, int64(offset))
 		if err != nil {
-			if err == io.EOF {
-				return nil, false, nil
+			if err != io.EOF {
+				return nil, false, err
 			}
-			return nil, false, err
+			isEOF = true
+		}
+
+		if len(dataBuf) == 0 {
+			break
 		}
 
 		boundaryBegin = bin.Uint16(dataBuf[:bufBoundaryBytes])
@@ -342,16 +380,33 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 		}
 
 		seq, _ := c.finishRec.getWaterMark()
-		items = append(items, &PoppedMsgItem{
-			Topic:     c.topic,
-			IdxOffset: c.nextIdxCursor,
-			Seq:       seq,
-			Data:      data,
-			CreatedAt: int64(createdAt),
-		})
 
-		totalDataBytes += len(data)
+		if !c.pendingRec.isPending(seq, c.nextIdxCursor) && !c.pendingRec.isConfirmed(seq, c.nextIdxCursor) {
+			pendings = append(pendings, &pendingMsgIdx{
+				seq:       seq,
+				idxOffset: c.nextIdxCursor,
+			})
+
+			items = append(items, &PoppedMsgItem{
+				Topic:     c.topic,
+				IdxOffset: c.nextIdxCursor,
+				Seq:       seq,
+				Data:      data,
+				CreatedAt: int64(createdAt),
+			})
+
+			totalDataBytes += len(data)
+		}
+
+		if isEOF {
+			break
+		}
+
 		c.nextIdxCursor++
+	}
+
+	if err := c.pendingRec.pending(pendings, false); err != nil {
+		return nil, false, err
 	}
 
 	return items, true, nil
@@ -365,22 +420,53 @@ func (c *Consumer) isSubscribed() bool {
 	return c.status == runStateRunning
 }
 
-func (c *Consumer) confirmMsg(seq uint64, offset uint32) {
+func (c *Consumer) confirmMsg(seq uint64, idxOffset uint32) {
 	if c.isSubscribed() {
 		c.confirmMsgCh <- &confirmMsgReq{
-			seq:    seq,
-			offset: offset,
+			seq:       seq,
+			idxOffset: idxOffset,
 		}
 		return
 	}
-	if err := c.doConfirmMsg(seq, offset); err != nil {
+
+	if notPending, err := c.unPendMsg([]*pendingMsgIdx{{seq: seq, idxOffset: idxOffset}}); err != nil {
+		logger.Errorf(err.Error())
+		return
+	} else if !notPending {
+		return
+	}
+	if err := c.updateFinishWaterMark(seq, idxOffset); err != nil {
 		logger.Errorf(err.Error())
 	}
 }
 
-func (c *Consumer) doConfirmMsg(seq uint64, offset uint32) error {
+func (c *Consumer) isNotConfirmed(seq uint64, idxOffset uint32) bool {
+	if c.pendingRec.isEmpty() {
+		return false
+	}
+
+	return c.pendingRec.isPending(seq, idxOffset)
+}
+
+func (c *Consumer) unPendMsg(pendings []*pendingMsgIdx) (bool, error) {
+	c.opPendingRecMu.Lock()
+	defer c.opPendingRecMu.Unlock()
+
+	if err := c.pendingRec.unPend(pendings, false); err != nil {
+		return false, err
+	}
+
+	if !c.pendingRec.isEmpty() {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (c *Consumer) updateFinishWaterMark(seq uint64, offset uint32) error {
 	c.opFinishRecMu.Lock()
 	defer c.opFinishRecMu.Unlock()
+
 	consumingSeq, consumedIdxNum := c.finishRec.getWaterMark()
 
 	if consumingSeq > seq {
