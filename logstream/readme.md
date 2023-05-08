@@ -171,4 +171,8 @@ func (*Reader) ConfirmMsg()
 
 开始消费线程
 func (*Reader) Start()
+
+
+安全退出释放资源
+func (*Reader) Exit()
 ````
