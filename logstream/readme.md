@@ -136,6 +136,14 @@ readStream, err = NewReader("", func(items []*PoppedMsgItem) error {
 if err != nil {
 	panic(err)
 }
+
+go func() {
+	signCh := make(chan os.Signal)
+	signal.Notify(signCh)
+	<-signCh
+	readStream.Exit()
+}()
+
 // 开始消费
 readStream.Start()
 ````
