@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/995933447/confloader"
 	"github.com/gzjjyz/srvlib/logger"
-	"github.com/gzjjyz/srvlib/utils"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,14 +11,10 @@ import (
 )
 
 var (
-	errWriterExited = errors.New("writer already exited")
+	ErrWriterExited = errors.New("writer already exited")
 )
 
 func NewWriter(cfgFilePath string) (*Writer, error) {
-	if !logger.HasInit() {
-		return nil, errors.New("logger not init")
-	}
-
 	if cfgFilePath == "" {
 		cfgFilePath = defaultCfgFilePath
 	}
@@ -46,33 +41,33 @@ func NewWriter(cfgFilePath string) (*Writer, error) {
 	}
 	writer.compressTopics.reset(cfg.CompressTopics)
 
-	utils.ProtectGo(func() {
+	go func() {
 		watchWriterCfg(writer, &cfg, cfgLoader)
-	})
+	}()
 
-	utils.ProtectGo(func() {
+	go func() {
 		writer.loop()
-	})
+	}()
 
 	return writer, nil
 }
 
 func watchWriterCfg(writer *Writer, cfg *Cfg, cfgLoader *confloader.Loader) {
 	refreshCfgErr := make(chan error)
-	utils.ProtectGo(func() {
+	go func() {
 		refreshCfgTk := time.NewTicker(refreshCfgInterval + time.Second)
 		defer refreshCfgTk.Stop()
 		for {
 			select {
 			case err := <-refreshCfgErr:
-				logger.Errorf(err.Error())
+				logger.Warn(err.Error())
 			case <-writer.unwatchCfgSignCh:
 			case <-refreshCfgTk.C:
 				writer.opOutputMu.Lock()
 				var err error
 				writer.dataFileMaxBytes, err = parseMemSizeStrToBytes(cfg.DataFileMaxSize)
 				if err != nil {
-					logger.Errorf(err.Error())
+					logger.Warn(err.Error())
 					continue
 				}
 				writer.idxFileMaxItemNum = cfg.IdxFileMaxItemNum
@@ -96,7 +91,7 @@ func watchWriterCfg(writer *Writer, cfg *Cfg, cfgLoader *confloader.Loader) {
 				time.Sleep(time.Second * 5)
 			}
 		}
-	})
+	}()
 	cfgLoader.WatchToLoad(refreshCfgErr)
 }
 
@@ -150,7 +145,8 @@ func (w *Writer) loop() {
 				if !corrupted {
 					continue
 				}
-				logger.Errorf(errFileCorrupted.Error())
+
+				logger.Errorf(err.Error())
 
 				if err = output.openNewFile(); err != nil {
 					output.idxFp = nil
@@ -263,7 +259,7 @@ func (w *Writer) Resume() error {
 
 	// already exited, Not allow resume
 	if w.IsExited() {
-		return errWriterExited
+		return ErrWriterExited
 	}
 
 	w.status = runStateRunning
