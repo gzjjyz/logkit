@@ -94,7 +94,7 @@ func watchReaderCfg(reader *Reader, cfgLoader *confloader.Loader, cfg *Cfg) {
 					var err error
 					memMaxBytes, err = parseMemSizeStrToBytes(cfg.MemMaxSize)
 					if err != nil {
-						logger.Warn(err.Error())
+						logger.Errorf(err.Error())
 						break
 					}
 				}
@@ -117,7 +117,7 @@ func watchReaderCfg(reader *Reader, cfgLoader *confloader.Loader, cfg *Cfg) {
 				reader.whiteTopics.reset(cfg.WhiteTopics)
 				reader.blackTopics.reset(cfg.BlackTopics)
 				if err := reader.init(); err != nil {
-					logger.Errorf(err.Error())
+					logger.Warn(err.Error())
 				}
 				reader.accessFickleMu.Unlock()
 			}
@@ -318,9 +318,10 @@ func (r *Reader) runForwardWorker() {
 				}
 				r.accessFickleMu.RUnlock()
 				if err := r.doForward(msgItems); err != nil {
-					logger.Debug(err.Error())
-					r.retryCh <- msgItems
+					logger.Errorf(err.Error())
 				}
+
+				r.retryCh <- msgItems
 			}
 		}
 	out:
@@ -359,21 +360,23 @@ func (r *Reader) Start() {
 	// schedule retry messages and dynamically controller worker pool size
 	expandWorkerPoolTk := time.NewTicker(time.Second * 3)
 	defer expandWorkerPoolTk.Stop()
+	retryTk := time.NewTicker(time.Second)
+	defer retryTk.Stop()
 	var (
-		retryMsgItemsList [][]*PoppedMsgItem
-		retryMsgItems     []*PoppedMsgItem
-		forwardCh         chan []*PoppedMsgItem
+		retryMsgQ      retryMsgQueue
+		forwardCh      chan []*PoppedMsgItem
+		realRetryItems []*PoppedMsgItem
 	)
 	for {
-		if len(retryMsgItemsList) > 0 && retryMsgItems == nil {
-			forwardCh = r.forwardCh
-			retryMsgItems = retryMsgItemsList[0]
-			retryMsgItemsList = retryMsgItemsList[1:]
-		}
-
 		select {
-		case forwardCh <- retryMsgItems:
-			retryMsgItems = nil
+		case <-r.exitSignCh:
+			return
+		case <-expandWorkerPoolTk.C:
+			r.accessFickleMu.RLock()
+			r.expandWorkerPool()
+			r.accessFickleMu.RUnlock()
+		case forwardCh <- realRetryItems:
+			realRetryItems = nil
 			forwardCh = nil
 		case msgItems := <-r.retryCh:
 			consumer := r.topicConsumerMap[msgItems[0].Topic]
@@ -382,15 +385,44 @@ func (r *Reader) Start() {
 				if !consumer.isNotConfirmed(msgItem.Seq, msgItem.IdxOffset) {
 					continue
 				}
+				msgItem.RetryCnt++
+				retryDelaySec := msgItem.RetryCnt
+				if retryDelaySec > 5 {
+					retryDelaySec = 5
+				}
+				msgItem.RetryAt = uint32(time.Now().Unix()) + retryDelaySec
 				notConfirmedList = append(notConfirmedList, msgItem)
 			}
-			retryMsgItemsList = append(retryMsgItemsList, notConfirmedList)
-		case <-expandWorkerPoolTk.C:
-			r.accessFickleMu.RLock()
-			r.expandWorkerPool()
-			r.accessFickleMu.RUnlock()
-		case <-r.exitSignCh:
-			return
+			if len(notConfirmedList) > 0 {
+				retryMsgQ.pushRetry(notConfirmedList)
+			}
+		case <-retryTk.C:
+			if realRetryItems != nil {
+				break
+			}
+
+			for {
+				retryMsgItems := retryMsgQ.popRetry()
+				if retryMsgItems == nil {
+					break
+				}
+
+				consumer := r.topicConsumerMap[retryMsgItems[0].Topic]
+				for _, msgItem := range retryMsgItems {
+					if !consumer.isNotConfirmed(msgItem.Seq, msgItem.IdxOffset) {
+						continue
+					}
+					realRetryItems = append(realRetryItems, msgItem)
+				}
+
+				if realRetryItems == nil {
+					continue
+				}
+
+				break
+			}
+
+			forwardCh = r.forwardCh
 		}
 	}
 }

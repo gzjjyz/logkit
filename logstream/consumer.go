@@ -71,7 +71,6 @@ type Consumer struct {
 	finishRec           *ConsumeWaterMarkRec
 	opFinishRecMu       sync.RWMutex
 	pendingRec          *ConsumePendingRec
-	opPendingRecMu      sync.RWMutex
 	msgNum              uint32
 	isWaitingMsgConfirm atomic.Value // bool
 	unsubscribeSignCh   chan struct{}
@@ -110,6 +109,7 @@ func (c *Consumer) switchNextSeqFile() error {
 		err = os.Remove(origIdxFp.Name())
 		if err != nil {
 			logger.Errorf(err.Error())
+			return
 		}
 
 		err = os.Remove(origDataFp.Name())
@@ -300,6 +300,8 @@ type PoppedMsgItem struct {
 	IdxOffset uint32
 	Data      []byte
 	CreatedAt int64
+	RetryAt   uint32
+	RetryCnt  uint32
 }
 
 func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
@@ -381,7 +383,7 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 
 		seq, _ := c.finishRec.getWaterMark()
 
-		if !c.pendingRec.isPending(seq, c.nextIdxCursor) && !c.pendingRec.isConfirmed(seq, c.nextIdxCursor) {
+		if !c.pendingRec.isConfirmed(seq, c.nextIdxCursor) {
 			pendings = append(pendings, &pendingMsgIdx{
 				seq:       seq,
 				idxOffset: c.nextIdxCursor,
@@ -449,9 +451,6 @@ func (c *Consumer) isNotConfirmed(seq uint64, idxOffset uint32) bool {
 }
 
 func (c *Consumer) unPendMsg(pendings []*pendingMsgIdx) (bool, error) {
-	c.opPendingRecMu.Lock()
-	defer c.opPendingRecMu.Unlock()
-
 	if err := c.pendingRec.unPend(pendings, false); err != nil {
 		return false, err
 	}

@@ -3,8 +3,10 @@ package logstream
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/gzjjyz/srvlib/logger"
 	"io"
 	"os"
+	"sync"
 )
 
 // item begin marker | seq | idx offset | item end marker
@@ -23,6 +25,8 @@ type pendingMsgIdx struct {
 type ConsumePendingRec struct {
 	baseDir         string
 	topic           string
+	pendingMu       sync.RWMutex
+	unPendMu        sync.RWMutex
 	pendingMsgIdxes map[uint64]map[uint32]struct{}
 	unPendMsgIdxes  map[uint64]map[uint32]struct{}
 	pendingFp       *os.File
@@ -59,11 +63,19 @@ func newConsumePendingRec(baseDir, topic string) (*ConsumePendingRec, error) {
 }
 
 func (r *ConsumePendingRec) syncDisk() {
-	_ = r.pendingFp.Sync()
-	_ = r.unPendFp.Sync()
+	if err := r.pendingFp.Sync(); err != nil {
+		logger.Warn(err.Error())
+	}
+
+	if err := r.unPendFp.Sync(); err != nil {
+		logger.Warn(err.Error())
+	}
 }
 
 func (r *ConsumePendingRec) isConfirmed(seq uint64, idxOffset uint32) bool {
+	r.unPendMu.RLock()
+	defer r.unPendMu.RUnlock()
+
 	if idxSet, ok := r.unPendMsgIdxes[seq]; ok {
 		if _, ok = idxSet[idxOffset]; ok {
 			return true
@@ -74,6 +86,9 @@ func (r *ConsumePendingRec) isConfirmed(seq uint64, idxOffset uint32) bool {
 }
 
 func (r *ConsumePendingRec) isPending(seq uint64, idxOffset uint32) bool {
+	r.pendingMu.RLock()
+	defer r.pendingMu.RUnlock()
+
 	if idxSet, ok := r.pendingMsgIdxes[seq]; !ok {
 		return false
 	} else if _, ok = idxSet[idxOffset]; !ok {
@@ -84,6 +99,9 @@ func (r *ConsumePendingRec) isPending(seq uint64, idxOffset uint32) bool {
 }
 
 func (r *ConsumePendingRec) isEmpty() bool {
+	r.pendingMu.RLock()
+	defer r.pendingMu.RUnlock()
+
 	return len(r.pendingMsgIdxes) == 0
 }
 
@@ -176,6 +194,10 @@ func (r *ConsumePendingRec) loadPendings(isLoadUnPend bool) ([]*pendingMsgIdx, e
 }
 
 func (r *ConsumePendingRec) pending(pendings []*pendingMsgIdx, onlyPendOnMem bool) error {
+	r.pendingMu.Lock()
+	defer r.pendingMu.Unlock()
+
+	r.unPendMu.RLock()
 	var enqueued []*pendingMsgIdx
 	for _, pending := range pendings {
 		if unPendIdxSet, ok := r.unPendMsgIdxes[pending.seq]; ok {
@@ -203,6 +225,7 @@ func (r *ConsumePendingRec) pending(pendings []*pendingMsgIdx, onlyPendOnMem boo
 
 		enqueued = append(enqueued, pending)
 	}
+	r.unPendMu.RUnlock()
 
 	if !onlyPendOnMem {
 		if err := r.write(false, enqueued); err != nil {
@@ -218,6 +241,9 @@ func (r *ConsumePendingRec) pending(pendings []*pendingMsgIdx, onlyPendOnMem boo
 }
 
 func (r *ConsumePendingRec) unPend(pendings []*pendingMsgIdx, onlyUnPendMem bool) error {
+	r.unPendMu.Lock()
+	defer r.unPendMu.Unlock()
+
 	var enqueued []*pendingMsgIdx
 	for _, pending := range pendings {
 		unPendIdxSet, ok := r.unPendMsgIdxes[pending.seq]
@@ -239,6 +265,8 @@ func (r *ConsumePendingRec) unPend(pendings []*pendingMsgIdx, onlyUnPendMem bool
 		}
 	}
 
+	r.pendingMu.Lock()
+	defer r.pendingMu.Unlock()
 	for _, pending := range enqueued {
 		r.unPendMsgIdxes[pending.seq][pending.idxOffset] = struct{}{}
 		pendingMsgIdxes, ok := r.pendingMsgIdxes[pending.seq]
@@ -252,7 +280,7 @@ func (r *ConsumePendingRec) unPend(pendings []*pendingMsgIdx, onlyUnPendMem bool
 		delete(r.pendingMsgIdxes, pending.seq)
 	}
 
-	if r.isEmpty() {
+	if len(r.pendingMsgIdxes) == 0 {
 		var isTruncateFailed bool
 		if err := r.pendingFp.Truncate(0); err == nil {
 			if _, err = r.pendingFp.Seek(0, 0); err != nil {
