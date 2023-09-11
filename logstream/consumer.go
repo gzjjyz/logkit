@@ -347,6 +347,7 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 		boundaryBegin := bin.Uint16(idxBuf[:bufBoundaryBytes])
 		boundaryEnd := bin.Uint16(idxBuf[idxBytes-bufBoundaryBytes:])
 		if boundaryBegin != bufBoundaryBegin || boundaryEnd != bufBoundaryEnd {
+			logger.Errorf("boundaryBegin or bufBoundaryEnd mark wrong")
 			return nil, false, errFileCorrupted
 		}
 
@@ -371,6 +372,7 @@ func (c *Consumer) consumeBatch() ([]*PoppedMsgItem, bool, error) {
 		boundaryBegin = bin.Uint16(dataBuf[:bufBoundaryBytes])
 		boundaryEnd = bin.Uint16(dataBuf[dataBytes-bufBoundaryBytes:])
 		if boundaryBegin != bufBoundaryBegin || boundaryEnd != bufBoundaryEnd {
+			logger.Errorf("boundaryBegin != bufBoundaryBegin || boundaryEnd != bufBoundaryEnd")
 			return nil, false, errFileCorrupted
 		}
 

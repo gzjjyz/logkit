@@ -275,6 +275,7 @@ func (o *Output) openNewFile() error {
 	}
 
 	if idxFileState.Size()%idxBytes > 0 {
+		logger.Errorf("idxFileState.Size()%idxBytes > 0")
 		return errFileCorrupted
 	}
 

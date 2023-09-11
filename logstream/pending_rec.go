@@ -152,6 +152,7 @@ func (r *ConsumePendingRec) loadPendings(isLoadUnPend bool) ([]*pendingMsgIdx, e
 		}
 
 		if n%pendingIdxBufBytes > 0 {
+			logger.Errorf("n%pendingIdxBufBytes > 0")
 			return nil, errFileCorrupted
 		}
 
@@ -164,6 +165,7 @@ func (r *ConsumePendingRec) loadPendings(isLoadUnPend bool) ([]*pendingMsgIdx, e
 			boundaryBegin := bin.Uint16(pendingBuf[:bufBoundaryBytes])
 			boundaryEnd := bin.Uint16(pendingBuf[pendingIdxBufBytes-bufBoundaryBytes:])
 			if boundaryBegin != bufBoundaryBegin || boundaryEnd != bufBoundaryEnd {
+				logger.Errorf("boundaryBegin != bufBoundaryBegin || boundaryEnd != bufBoundaryEnd")
 				return nil, errFileCorrupted
 			}
 
