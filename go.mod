@@ -10,6 +10,8 @@ require (
 )
 
 require (
+	github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1 // indirect
+	github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/huandu/go-clone v1.6.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

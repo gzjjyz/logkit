@@ -1,5 +1,9 @@
 github.com/995933447/confloader v0.0.0-20230314141707-e7b191386ae2 h1:lElTU+vnP6+DR9W6kGbnHXL45zJsXFsWtvYt6bForCA=
 github.com/995933447/confloader v0.0.0-20230314141707-e7b191386ae2/go.mod h1:52j1FekZ42S3gc7Fy8A54Mr0H5MVbEbRLo8rG/HRY5U=
+github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1 h1:5ioS07sepDUliBiX/1CHSXAabFS1Yp2PfPidMIGcwCc=
+github.com/995933447/goconsole v0.0.0-20230209083111-0fccb97a62d1/go.mod h1:eOQfCSv/zLNz8iC0X4dDn3ULaDB1T/ZfmjkS2YRchyA=
+github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696 h1:GzBuvejakMWMZ6QWpbpcFmJb9WYrZ++yOrm/IEap+hw=
+github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696/go.mod h1:Y48pg+Gwti1Ck6BZSCm/+UHmtzC4A1pARw6UdFMpNaI=
 github.com/BurntSushi/toml v1.2.1 h1:9F2/+DoOYIOksmaJFPw1tGFy1eDnIJXg+UHjuD8lTak=
 github.com/BurntSushi/toml v1.2.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
