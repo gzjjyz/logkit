@@ -1,0 +1,25 @@
+[32m[Info][0m	[32m09-12 21:50:39.8647 [log.go:110 InitLogger][0m ==========================================
+[32m[Info][0m	[32m09-12 21:50:39.8787 [log.go:111 InitLogger][0m ===log:LogStreamTool,pid:72444==logPath:log==
+[32m[Info][0m	[32m09-12 21:50:39.8787 [log.go:112 InitLogger][0m ==========================================
+[31m[Error][0m	[32m09-12 21:50:39.8792 [fix_util.go:27 func1][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[31m[Error][0m	[32m09-12 21:50:39.8792 [fix_util.go:106 CheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[31m[Error][0m	[32m09-12 21:50:39.8792 [fix_util_test.go:11 TestCheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[32m[Info][0m	[32m09-12 21:51:21.644 [log.go:110 InitLogger][0m ==========================================
+[32m[Info][0m	[32m09-12 21:51:21.6525 [log.go:111 InitLogger][0m ===log:LogStreamTool,pid:78128==logPath:log==
+[32m[Info][0m	[32m09-12 21:51:21.6525 [log.go:112 InitLogger][0m ==========================================
+[31m[Error][0m	[32m09-12 21:51:58.9375 [fix_util.go:27 func1][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[31m[Error][0m	[32m09-12 21:51:58.9375 [fix_util.go:106 CheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[31m[Error][0m	[32m09-12 21:51:58.9375 [fix_util_test.go:11 TestCheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic4/D:\test_topic/logstreamtopic_test_topic4/2023051020_1.dat happen corrupted, wrong bytes offset:538976288 end:1077952567
+[32m[Info][0m	[32m09-12 21:55:17.9194 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:55:17.9244 [log.go:110 InitLogger][0m ===log:LogStreamTool,pid:82024==logPath:log==
+[32m[Info][0m	[32m09-12 21:55:17.9244 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:55:35.2254 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:56:03.0906 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:56:03.0961 [log.go:110 InitLogger][0m ===log:LogStreamTool,pid:80028==logPath:log==
+[32m[Info][0m	[32m09-12 21:56:03.0961 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:56:55.6688 [log.go:186 Info][0m ==========================================
+[32m[Info][0m	[32m09-12 21:56:55.6743 [log.go:110 InitLogger][0m ===log:LogStreamTool,pid:72932==logPath:log==
+[32m[Info][0m	[32m09-12 21:56:55.6743 [log.go:186 Info][0m ==========================================
+[31m[Error][0m	[32m09-12 21:56:55.6748 [fix_util.go:26 func1][0m file D:\test_topic/logstreamtopic_test_topic23/D:\test_topic/logstreamtopic_test_topic23/2023091221_1.dat happen corrupted, wrong bytes offset:92 end:115
+[31m[Error][0m	[32m09-12 21:56:55.6748 [fix_util.go:105 CheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic23/D:\test_topic/logstreamtopic_test_topic23/2023091221_1.dat happen corrupted, wrong bytes offset:92 end:115
+[31m[Error][0m	[32m09-12 21:56:55.6748 [fix_util_test.go:11 TestCheckIdxCorruption][0m file D:\test_topic/logstreamtopic_test_topic23/D:\test_topic/logstreamtopic_test_topic23/2023091221_1.dat happen corrupted, wrong bytes offset:92 end:115

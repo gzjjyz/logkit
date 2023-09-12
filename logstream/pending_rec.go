@@ -152,7 +152,7 @@ func (r *ConsumePendingRec) loadPendings(isLoadUnPend bool) ([]*pendingMsgIdx, e
 		}
 
 		if n%pendingIdxBufBytes > 0 {
-			logger.Errorf("n%pendingIdxBufBytes > 0")
+			logger.Errorf("n%%pendingIdxBufBytes > 0")
 			return nil, errFileCorrupted
 		}
 

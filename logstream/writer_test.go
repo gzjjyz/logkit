@@ -13,12 +13,12 @@ func TestWriter_Write(t *testing.T) {
 }
 
 func TestWriter_Flush(t *testing.T) {
-	writer, err := NewWriter("")
+	writer, err := NewWriter("C:\\logstream\\meta.json")
 	if err != nil {
 		t.Log(err)
 		return
 	}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 5; i++ {
 		writer.Write("test_topic23", []byte(fmt.Sprintf("hello world:%d times", i)))
 	}
 	writer.Flush()
