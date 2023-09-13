@@ -11,7 +11,7 @@ func init() {
 }
 
 func main() {
-	goconsole.Register("CheckIdxCorrupt", "-d [meta file path]", func() {
+	goconsole.Register("CheckIdxCorrupt", "-d [data dir path]", func() {
 		err := CheckIdxCorruption(scan.OptStrDefault("d", ""))
 		if err != nil {
 			logger.Errorf("err:%v", err.Error())
