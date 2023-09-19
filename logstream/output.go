@@ -3,7 +3,7 @@ package logstream
 import (
 	"encoding/binary"
 	"github.com/golang/snappy"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"os"
 	"time"
 )

@@ -3,11 +3,11 @@ package main
 import (
 	"github.com/995933447/goconsole"
 	"github.com/995933447/std-go/scan"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 )
 
 func init() {
-	logger.InitLogger("LogStreamTool")
+	logger.InitLogger(logger.WithAppName("LogStreamTool"))
 }
 
 func main() {

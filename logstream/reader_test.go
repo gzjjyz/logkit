@@ -2,7 +2,7 @@ package logstream
 
 import (
 	"fmt"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"os"
 	"os/signal"
 	"testing"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestReader_Start(t *testing.T) {
-	logger.InitLogger("testreader")
+	logger.InitLogger(logger.WithAppName("testreader"))
 
 	var (
 		readStream *Reader
