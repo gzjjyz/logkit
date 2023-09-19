@@ -3,7 +3,7 @@ package logstream
 import (
 	"errors"
 	"github.com/995933447/confloader"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"path/filepath"
 	"strings"
 	"sync"

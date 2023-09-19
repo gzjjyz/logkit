@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"testing"
 )
 

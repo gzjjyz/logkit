@@ -2,7 +2,7 @@ package logstream
 
 import (
 	"github.com/995933447/confloader"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"sync"
 	"time"
 )

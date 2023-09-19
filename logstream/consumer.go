@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/snappy"
-	"github.com/gzjjyz/srvlib/logger"
+	"github.com/gzjjyz/logger"
 	"io"
 	"os"
 	"sync"
