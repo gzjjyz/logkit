@@ -8,8 +8,8 @@ require (
 	github.com/995933447/std-go v0.0.0-20220806175833-ab3496c0b696
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/snappy v0.0.4
-	github.com/gzjjyz/logger v0.0.0-20230915095704-4f47a2bda476
-	github.com/gzjjyz/srvlib v1.0.0
+	github.com/gzjjyz/logger v1.0.0
+	github.com/gzjjyz/srvlib v1.0.2
 )
 
 require (
